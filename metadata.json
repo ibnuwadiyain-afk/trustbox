@@ -1,0 +1,6 @@
+{
+  "name": "صناديق الأمانات",
+  "description": "تطبيق متكامل لإدارة صناديق الأمانات والحسابات المالية بدون إنترنت مع النسخ الاحتياطي عبر Google Drive والمصادقة الآمنة",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
