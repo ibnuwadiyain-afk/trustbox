@@ -29,12 +29,17 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.CloudUpload
+import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.LockReset
 import androidx.compose.material.icons.filled.Paid
+import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.Pin
+import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.SettingsBrightness
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
@@ -122,6 +127,15 @@ fun SettingsScreen(
   ) { uri: Uri? ->
     uri?.let {
       viewModel.inspectBackupFile(it, context)
+    }
+  }
+
+  // SAF File Launcher for Full PDF Report
+  val pdfReportLauncher = rememberLauncherForActivityResult(
+    contract = ActivityResultContracts.CreateDocument("application/pdf")
+  ) { uri: Uri? ->
+    uri?.let {
+      viewModel.exportAllClientsPdf(it, context)
     }
   }
 
@@ -478,7 +492,181 @@ fun SettingsScreen(
           }
         }
 
-        // Section 3: Backup & Restore (Google Drive / Storage SAF)
+        // Section 3: Theme Options (Light & Dark mode)
+        SettingsSectionHeader(title = "المظهر والألوان", icon = Icons.Default.Palette)
+
+        Card(
+          modifier = Modifier.fillMaxWidth(),
+          shape = RoundedCornerShape(18.dp),
+          colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+          elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        ) {
+          Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+              text = "اختر وضع السمة المفضل:",
+              style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
+            )
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Option 1: System
+            Row(
+              modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(10.dp))
+                .clickable { viewModel.setThemeMode(com.example.data.preferences.ThemeMode.SYSTEM) }
+                .padding(vertical = 8.dp, horizontal = 4.dp),
+              verticalAlignment = Alignment.CenterVertically
+            ) {
+              RadioButton(
+                selected = uiState.themeMode == com.example.data.preferences.ThemeMode.SYSTEM,
+                onClick = { viewModel.setThemeMode(com.example.data.preferences.ThemeMode.SYSTEM) },
+                colors = RadioButtonDefaults.colors(selectedColor = EmeraldPrimary)
+              )
+              Spacer(modifier = Modifier.width(8.dp))
+              Icon(
+                imageVector = Icons.Default.SettingsBrightness,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(20.dp)
+              )
+              Spacer(modifier = Modifier.width(8.dp))
+              Column {
+                Text(
+                  text = "تلقائي (حسب إعدادات نظام الجهاز)",
+                  style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold)
+                )
+                Text(
+                  text = "يتغير تلقائياً مع وضع النظام (داكن أو فاتح)",
+                  style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
+                )
+              }
+            }
+
+            // Option 2: Light
+            Row(
+              modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(10.dp))
+                .clickable { viewModel.setThemeMode(com.example.data.preferences.ThemeMode.LIGHT) }
+                .padding(vertical = 8.dp, horizontal = 4.dp),
+              verticalAlignment = Alignment.CenterVertically
+            ) {
+              RadioButton(
+                selected = uiState.themeMode == com.example.data.preferences.ThemeMode.LIGHT,
+                onClick = { viewModel.setThemeMode(com.example.data.preferences.ThemeMode.LIGHT) },
+                colors = RadioButtonDefaults.colors(selectedColor = EmeraldPrimary)
+              )
+              Spacer(modifier = Modifier.width(8.dp))
+              Icon(
+                imageVector = Icons.Default.LightMode,
+                contentDescription = null,
+                tint = EmeraldPrimary,
+                modifier = Modifier.size(20.dp)
+              )
+              Spacer(modifier = Modifier.width(8.dp))
+              Column {
+                Text(
+                  text = "الوضع الفاتح (Light Mode)",
+                  style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold)
+                )
+                Text(
+                  text = "خلفية ناصعة ومريحة للقراءة في الإضاءة النهارية",
+                  style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
+                )
+              }
+            }
+
+            // Option 3: Dark
+            Row(
+              modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(10.dp))
+                .clickable { viewModel.setThemeMode(com.example.data.preferences.ThemeMode.DARK) }
+                .padding(vertical = 8.dp, horizontal = 4.dp),
+              verticalAlignment = Alignment.CenterVertically
+            ) {
+              RadioButton(
+                selected = uiState.themeMode == com.example.data.preferences.ThemeMode.DARK,
+                onClick = { viewModel.setThemeMode(com.example.data.preferences.ThemeMode.DARK) },
+                colors = RadioButtonDefaults.colors(selectedColor = EmeraldPrimary)
+              )
+              Spacer(modifier = Modifier.width(8.dp))
+              Icon(
+                imageVector = Icons.Default.DarkMode,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.secondary,
+                modifier = Modifier.size(20.dp)
+              )
+              Spacer(modifier = Modifier.width(8.dp))
+              Column {
+                Text(
+                  text = "الوضع الداكن (Dark Mode)",
+                  style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold)
+                )
+                Text(
+                  text = "مظهر داكن عصري وموفر للبطارية ومريح للعين",
+                  style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
+                )
+              }
+            }
+          }
+        }
+
+        // Section 4: PDF Reports Export
+        SettingsSectionHeader(title = "تقارير PDF والطباعة", icon = Icons.Default.PictureAsPdf)
+
+        Card(
+          modifier = Modifier.fillMaxWidth(),
+          shape = RoundedCornerShape(18.dp),
+          colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+          elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        ) {
+          Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+              text = "تصدير تقرير شامل لكافة الصناديق والأرصدة",
+              style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+              text = "إنشاء مستند PDF رسمي جاهز للطباعة أو المشاركة يتضمن قائمة بجميع العملاء وأرقام صناديقهم وأرصدتهم وإجمالي أموال الخزينة.",
+              style = MaterialTheme.typography.bodySmall.copy(
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                lineHeight = 18.sp
+              )
+            )
+            Spacer(modifier = Modifier.height(14.dp))
+
+            Button(
+              onClick = {
+                val filename = "تقرير_صناديق_الأمانات_${System.currentTimeMillis()}.pdf"
+                pdfReportLauncher.launch(filename)
+              },
+              modifier = Modifier
+                .fillMaxWidth()
+                .height(48.dp)
+                .testTag("export_all_clients_pdf_button"),
+              shape = RoundedCornerShape(12.dp),
+              colors = ButtonDefaults.buttonColors(containerColor = EmeraldPrimary),
+              enabled = !uiState.isExportingPdf
+            ) {
+              if (uiState.isExportingPdf) {
+                CircularProgressIndicator(
+                  color = Color.White,
+                  modifier = Modifier.size(20.dp),
+                  strokeWidth = 2.dp
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("جارٍ إنشاء ملف PDF...")
+              } else {
+                Icon(Icons.Default.PictureAsPdf, contentDescription = null)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("تصدير تقرير الخزينة العام (PDF)", fontWeight = FontWeight.Bold)
+              }
+            }
+          }
+        }
+
+        // Section 5: Backup & Restore (Google Drive / Storage SAF)
         SettingsSectionHeader(title = "النسخ الاحتياطي والاستعادة", icon = Icons.Default.Storage)
 
         Card(
@@ -562,7 +750,7 @@ fun SettingsScreen(
           }
         }
 
-        // Section 4: App Info
+        // Section 6: App Info
         SettingsSectionHeader(title = "معلومات النظام والأمان", icon = Icons.Default.Info)
 
         Card(
@@ -576,6 +764,8 @@ fun SettingsScreen(
             InfoRow(label = "اسم التطبيق", value = "صناديق الأمانات (SafeBox Vault)")
             InfoRow(label = "العملة الأساسية", value = "${uiState.currencyName} (${uiState.currencySymbol})")
             InfoRow(label = "نظام الأرقام", value = uiState.digitType.titleArabic)
+            InfoRow(label = "السمة / المظهر", value = uiState.themeMode.titleArabic)
+            InfoRow(label = "تقارير PDF", value = "تصدير كشوفات حساب وتقارير خزينة رسمية")
             InfoRow(label = "الإصدار", value = "1.0.0 (Offline-First Secure)")
             InfoRow(label = "قاعدة البيانات", value = "Room SQLite (معاملات ذرية مشفرة)")
             InfoRow(label = "التشفير", value = "SHA-256 + Salt + Android Keystore")

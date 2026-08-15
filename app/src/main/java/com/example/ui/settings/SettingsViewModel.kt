@@ -6,8 +6,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.data.backup.BackupManager
+import com.example.data.pdf.PdfReportGenerator
 import com.example.data.preferences.AppPreferences
 import com.example.data.preferences.DigitType
+import com.example.data.preferences.ThemeMode
 import com.example.data.repository.SafeBoxRepository
 import com.example.data.security.SecurityManager
 import com.example.domain.model.BackupPayload
@@ -23,8 +25,10 @@ data class SettingsUiState(
   val currencyCode: String = "LYD",
   val currencyName: String = "دينار ليبي",
   val digitType: DigitType = DigitType.WESTERN,
+  val themeMode: ThemeMode = ThemeMode.SYSTEM,
   val isExporting: Boolean = false,
   val isImporting: Boolean = false,
+  val isExportingPdf: Boolean = false,
   val exportSuccessMessage: String? = null,
   val errorMessage: String? = null,
   val restorePreview: BackupPayload? = null,
@@ -45,7 +49,8 @@ class SettingsViewModel(
       currencySymbol = appPreferences.state.value.currencySymbol,
       currencyCode = appPreferences.state.value.currencyCode,
       currencyName = appPreferences.state.value.currencyName,
-      digitType = appPreferences.state.value.digitType
+      digitType = appPreferences.state.value.digitType,
+      themeMode = appPreferences.state.value.themeMode
     )
   )
   val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
@@ -57,7 +62,64 @@ class SettingsViewModel(
           currencySymbol = prefState.currencySymbol,
           currencyCode = prefState.currencyCode,
           currencyName = prefState.currencyName,
-          digitType = prefState.digitType
+          digitType = prefState.digitType,
+          themeMode = prefState.themeMode
+        )
+      }
+    }
+  }
+
+  fun setThemeMode(mode: ThemeMode) {
+    appPreferences.setThemeMode(mode)
+    _uiState.value = _uiState.value.copy(
+      exportSuccessMessage = "تم تفعيل المظهر: ${mode.titleArabic}"
+    )
+  }
+
+  fun exportAllClientsPdf(fileUri: Uri, context: Context) {
+    viewModelScope.launch {
+      _uiState.value = _uiState.value.copy(
+        isExportingPdf = true,
+        errorMessage = null,
+        exportSuccessMessage = null
+      )
+
+      val clients = repository.getAllClientsEntities()
+      try {
+        val outputStream = context.contentResolver.openOutputStream(fileUri)
+        if (outputStream == null) {
+          _uiState.value = _uiState.value.copy(
+            isExportingPdf = false,
+            errorMessage = "تعذر فتح الملف لحفظ تقرير PDF"
+          )
+          return@launch
+        }
+
+        outputStream.use { os ->
+          val result = PdfReportGenerator.generateAllClientsReport(
+            context = context,
+            clients = clients,
+            outputStream = os
+          )
+
+          _uiState.value = _uiState.value.copy(isExportingPdf = false)
+          result.fold(
+            onSuccess = {
+              _uiState.value = _uiState.value.copy(
+                exportSuccessMessage = "تم تصدير تقرير الخزينة العام بصيغة PDF بنجاح"
+              )
+            },
+            onFailure = { err ->
+              _uiState.value = _uiState.value.copy(
+                errorMessage = "فشل تصدير التقرير: ${err.localizedMessage}"
+              )
+            }
+          )
+        }
+      } catch (e: Exception) {
+        _uiState.value = _uiState.value.copy(
+          isExportingPdf = false,
+          errorMessage = "حدث خطأ أثناء تصدير PDF: ${e.localizedMessage}"
         )
       }
     }

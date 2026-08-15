@@ -33,6 +33,7 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Message
+import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AlertDialog
@@ -145,6 +146,14 @@ fun ClientDetailScreen(
     }
   }
 
+  val createPdfLauncher = rememberLauncherForActivityResult(
+    contract = ActivityResultContracts.CreateDocument("application/pdf")
+  ) { uri ->
+    uri?.let {
+      viewModel.exportStatementPdf(it, context)
+    }
+  }
+
   CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
     Scaffold(
       modifier = modifier.fillMaxSize(),
@@ -166,6 +175,16 @@ fun ClientDetailScreen(
             }
           },
           actions = {
+            IconButton(
+              onClick = {
+                val clientNameSafe = (uiState.client?.name ?: "client").replace(" ", "_")
+                val filename = "كشف_حساب_${clientNameSafe}_${System.currentTimeMillis()}.pdf"
+                createPdfLauncher.launch(filename)
+              },
+              modifier = Modifier.testTag("export_client_pdf_button")
+            ) {
+              Icon(Icons.Default.PictureAsPdf, contentDescription = "تصدير كشف حساب PDF")
+            }
             IconButton(
               onClick = { showEditDialog = true },
               modifier = Modifier.testTag("detail_edit_button")

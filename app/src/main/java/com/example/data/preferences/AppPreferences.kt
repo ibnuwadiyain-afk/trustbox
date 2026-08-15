@@ -10,6 +10,12 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+enum class ThemeMode(val id: String, val titleArabic: String) {
+  SYSTEM("system", "تلقائي (حسب إعدادات النظام)"),
+  LIGHT("light", "الوضع الفاتح (Light Mode)"),
+  DARK("dark", "الوضع الداكن (Dark Mode)")
+}
+
 enum class DigitType(val id: String, val titleArabic: String, val example: String) {
   WESTERN("western", "أرقام عربية غربية / لاتينية", "1234.50"),
   EASTERN("eastern", "أرقام عربية مشرقية (هندية)", "١٢٣٤.٥٠")
@@ -45,7 +51,8 @@ data class AppPreferencesState(
   val currencySymbol: String = "د.ل",
   val currencyCode: String = "LYD",
   val currencyName: String = "دينار ليبي",
-  val digitType: DigitType = DigitType.WESTERN
+  val digitType: DigitType = DigitType.WESTERN,
+  val themeMode: ThemeMode = ThemeMode.SYSTEM
 )
 
 class AppPreferences(private val context: Context) {
@@ -61,6 +68,7 @@ class AppPreferences(private val context: Context) {
     private const val KEY_CURRENCY_CODE = "pref_currency_code"
     private const val KEY_CURRENCY_NAME = "pref_currency_name"
     private const val KEY_DIGIT_TYPE = "pref_digit_type"
+    private const val KEY_THEME_MODE = "pref_theme_mode"
 
     @Volatile
     private var INSTANCE: AppPreferences? = null
@@ -82,13 +90,24 @@ class AppPreferences(private val context: Context) {
     val name = prefs.getString(KEY_CURRENCY_NAME, "دينار ليبي") ?: "دينار ليبي"
     val digitTypeId = prefs.getString(KEY_DIGIT_TYPE, DigitType.WESTERN.id) ?: DigitType.WESTERN.id
     val digitType = if (digitTypeId == DigitType.EASTERN.id) DigitType.EASTERN else DigitType.WESTERN
+    val themeModeId = prefs.getString(KEY_THEME_MODE, ThemeMode.SYSTEM.id) ?: ThemeMode.SYSTEM.id
+    val themeMode = ThemeMode.values().find { it.id == themeModeId } ?: ThemeMode.SYSTEM
 
     return AppPreferencesState(
       currencySymbol = symbol,
       currencyCode = code,
       currencyName = name,
-      digitType = digitType
+      digitType = digitType,
+      themeMode = themeMode
     )
+  }
+
+  fun setThemeMode(mode: ThemeMode) {
+    prefs.edit()
+      .putString(KEY_THEME_MODE, mode.id)
+      .apply()
+
+    _state.value = _state.value.copy(themeMode = mode)
   }
 
   fun setCurrency(symbol: String, code: String, name: String) {

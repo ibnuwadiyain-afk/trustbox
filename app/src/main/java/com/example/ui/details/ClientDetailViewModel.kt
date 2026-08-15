@@ -1,9 +1,12 @@
 package com.example.ui.details
 
+import android.content.Context
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.data.notification.NotificationHelper
+import com.example.data.pdf.PdfReportGenerator
 import com.example.data.repository.SafeBoxRepository
 import com.example.domain.model.Client
 import com.example.domain.model.TransactionRecord
@@ -33,8 +36,16 @@ data class ClientDetailUiState(
   val transactions: List<TransactionRecord> = emptyList(),
   val isLoading: Boolean = false,
   val isProcessingTransaction: Boolean = false,
+  val isExportingPdf: Boolean = false,
   val errorMessage: String? = null,
   val successMessage: String? = null
+)
+
+private data class FourTuple(
+  val processing: Boolean,
+  val exportingPdf: Boolean,
+  val errorMessage: String?,
+  val successMessage: String?
 )
 
 class ClientDetailViewModel(
@@ -43,6 +54,7 @@ class ClientDetailViewModel(
 ) : ViewModel() {
 
   private val _isProcessing = MutableStateFlow(false)
+  private val _isExportingPdf = MutableStateFlow(false)
   private val _errorMessage = MutableStateFlow<String?>(null)
   private val _successMessage = MutableStateFlow<String?>(null)
 
@@ -50,25 +62,79 @@ class ClientDetailViewModel(
   val notificationPrompt: SharedFlow<NotificationPromptData> = _notificationPrompt.asSharedFlow()
 
   val uiState: StateFlow<ClientDetailUiState> = combine(
-    repository.getClientById(clientId),
-    repository.getTransactionsForClient(clientId),
-    _isProcessing,
-    _errorMessage,
-    _successMessage
-  ) { client, txList, processing, error, success ->
+    combine(
+      repository.getClientById(clientId),
+      repository.getTransactionsForClient(clientId)
+    ) { client, txList -> Pair(client, txList) },
+    combine(
+      _isProcessing,
+      _isExportingPdf,
+      _errorMessage,
+      _successMessage
+    ) { processing, exportingPdf, error, success ->
+      FourTuple(processing, exportingPdf, error, success)
+    }
+  ) { (client, txList), four ->
     ClientDetailUiState(
       client = client,
       transactions = txList,
       isLoading = false,
-      isProcessingTransaction = processing,
-      errorMessage = error,
-      successMessage = success
+      isProcessingTransaction = four.processing,
+      isExportingPdf = four.exportingPdf,
+      errorMessage = four.errorMessage,
+      successMessage = four.successMessage
     )
   }.stateIn(
     scope = viewModelScope,
     started = SharingStarted.WhileSubscribed(5000),
     initialValue = ClientDetailUiState(isLoading = true)
   )
+
+  fun exportStatementPdf(fileUri: Uri, context: Context) {
+    viewModelScope.launch {
+      val clientEntity = repository.getAllClientsEntities().find { it.id == clientId }
+      if (clientEntity == null) {
+        _errorMessage.value = "تعذر العثور على بيانات العميل لتصدير التقرير"
+        return@launch
+      }
+
+      _isExportingPdf.value = true
+      clearMessages()
+
+      val transactionsEntities = repository.getAllTransactionsEntities().filter { it.clientId == clientId }
+
+      try {
+        val outputStream = context.contentResolver.openOutputStream(fileUri)
+        if (outputStream == null) {
+          _isExportingPdf.value = false
+          _errorMessage.value = "تعذر الوصول للملف المحدد للكتابة"
+          return@launch
+        }
+
+        outputStream.use { os ->
+          val result = PdfReportGenerator.generateClientStatementReport(
+            context = context,
+            client = clientEntity,
+            transactions = transactionsEntities,
+            outputStream = os
+          )
+
+          _isExportingPdf.value = false
+          result.fold(
+            onSuccess = {
+              _successMessage.value = "تم تصدير كشف الحساب بصيغة PDF بنجاح"
+            },
+            onFailure = { err ->
+              _errorMessage.value = "فشل تصدير كشف الحساب: ${err.localizedMessage}"
+            }
+          )
+        }
+      } catch (e: Exception) {
+        _isExportingPdf.value = false
+        _errorMessage.value = "حدث خطأ أثناء تصدير PDF: ${e.localizedMessage}"
+      }
+    }
+  }
 
   fun clearMessages() {
     _errorMessage.value = null
