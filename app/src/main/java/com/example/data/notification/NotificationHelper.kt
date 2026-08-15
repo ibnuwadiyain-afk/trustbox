@@ -8,6 +8,7 @@ import android.net.Uri
 import android.os.Build
 import android.telephony.SmsManager
 import androidx.core.content.ContextCompat
+import com.example.data.preferences.AppPreferences
 import java.net.URLEncoder
 import java.text.DecimalFormat
 import java.text.SimpleDateFormat
@@ -16,26 +17,60 @@ import java.util.Locale
 
 object NotificationHelper {
 
-  private val currencyFormatter = DecimalFormat("#,##0.00")
-  private val dateFormatter = SimpleDateFormat("yyyy/MM/dd HH:mm", Locale.getDefault())
+  private val fallbackCurrencyFormatter = DecimalFormat("#,##0.00")
+  private val fallbackDateFormatter = SimpleDateFormat("yyyy/MM/dd HH:mm", Locale.getDefault())
 
   fun formatCurrency(amount: Double): String {
-    return currencyFormatter.format(amount)
+    val prefs = AppPreferences.getInstance(null as Context? ?: return fallbackCurrencyFormatter.format(amount))
+    return prefs.formatAmount(amount)
   }
 
-  fun formatDateTime(timestamp: Long): String {
-    return dateFormatter.format(Date(timestamp))
+  fun formatAmountWithCurrency(amount: Double, context: Context? = null): String {
+    val prefs = context?.let { AppPreferences.getInstance(it) }
+      ?: try {
+        // Try to access the singleton instance
+        AppPreferences.getInstance(null as Context? ?: throw Exception())
+      } catch (_: Exception) {
+        null
+      }
+
+    return if (prefs != null) {
+      prefs.formatAmountWithCurrency(amount)
+    } else {
+      "${fallbackCurrencyFormatter.format(amount)} د.ل"
+    }
+  }
+
+  fun formatDigits(text: String, context: Context? = null): String {
+    val prefs = context?.let { AppPreferences.getInstance(it) }
+      ?: try {
+        AppPreferences.getInstance(null as Context? ?: throw Exception())
+      } catch (_: Exception) {
+        null
+      }
+    return prefs?.formatDigits(text) ?: text
+  }
+
+  fun formatDateTime(timestamp: Long, context: Context? = null): String {
+    val prefs = context?.let { AppPreferences.getInstance(it) }
+      ?: try {
+        AppPreferences.getInstance(null as Context? ?: throw Exception())
+      } catch (_: Exception) {
+        null
+      }
+    return prefs?.formatDateTime(timestamp) ?: fallbackDateFormatter.format(Date(timestamp))
   }
 
   fun buildWithdrawalMessage(
     clientName: String,
     amount: Double,
     remainingBalance: Double,
-    timestamp: Long = System.currentTimeMillis()
+    timestamp: Long = System.currentTimeMillis(),
+    context: Context? = null
   ): String {
-    val dateStr = formatDateTime(timestamp)
-    val amountStr = formatCurrency(amount)
-    val balanceStr = formatCurrency(remainingBalance)
+    val dateStr = formatDateTime(timestamp, context)
+    val amountStr = formatAmountWithCurrency(amount, context)
+    val balanceStr = formatAmountWithCurrency(remainingBalance, context)
     return "السيد/ة $clientName، تم سحب $amountStr، الرصيد المتبقي: $balanceStr، التاريخ: $dateStr"
   }
 
@@ -43,16 +78,16 @@ object NotificationHelper {
     clientName: String,
     amount: Double,
     remainingBalance: Double,
-    timestamp: Long = System.currentTimeMillis()
+    timestamp: Long = System.currentTimeMillis(),
+    context: Context? = null
   ): String {
-    val dateStr = formatDateTime(timestamp)
-    val amountStr = formatCurrency(amount)
-    val balanceStr = formatCurrency(remainingBalance)
+    val dateStr = formatDateTime(timestamp, context)
+    val amountStr = formatAmountWithCurrency(amount, context)
+    val balanceStr = formatAmountWithCurrency(remainingBalance, context)
     return "السيد/ة $clientName، تم إيداع $amountStr، الرصيد المتبقي: $balanceStr، التاريخ: $dateStr"
   }
 
   fun cleanPhoneNumber(phone: String): String {
-    // Keep numbers and '+'
     var clean = phone.replace(Regex("[^0-9+]"), "")
     if (clean.startsWith("+")) {
       clean = clean.substring(1)
@@ -90,7 +125,6 @@ object NotificationHelper {
       }
 
       if (isWhatsAppInstalled(context)) {
-        // Try specific package if present
         try {
           intent.setPackage("com.whatsapp")
           context.startActivity(intent)

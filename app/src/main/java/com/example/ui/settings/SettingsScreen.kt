@@ -5,6 +5,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,6 +17,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -23,15 +26,16 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LockReset
+import androidx.compose.material.icons.filled.Paid
+import androidx.compose.material.icons.filled.Pin
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Storage
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -46,9 +50,12 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -79,9 +86,11 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.notification.NotificationHelper
+import com.example.data.preferences.CurrencyItem
+import com.example.data.preferences.DigitType
+import com.example.data.preferences.PREDEFINED_CURRENCIES
 import com.example.ui.theme.EmeraldPrimary
 import com.example.ui.theme.EmeraldPrimaryContainer
-import com.example.ui.theme.GoldTertiary
 import com.example.ui.theme.WithdrawalRed
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -96,6 +105,7 @@ fun SettingsScreen(
   val snackbarHostState = remember { SnackbarHostState() }
 
   var showChangePasswordDialog by remember { mutableStateOf(false) }
+  var showCurrencyDialog by remember { mutableStateOf(false) }
 
   // SAF Folder Launcher for Backup
   val backupFolderLauncher = rememberLauncherForActivityResult(
@@ -144,7 +154,7 @@ fun SettingsScreen(
         TopAppBar(
           title = {
             Text(
-              text = "الإعدادات والحماية",
+              text = "الإعدادات والخيارات",
               style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
             )
           },
@@ -171,7 +181,180 @@ fun SettingsScreen(
           .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
       ) {
-        // Section 1: Security & Authentication
+        // Section 1: Currency & Digits Formatting
+        SettingsSectionHeader(title = "العملة وتنسيق الأرقام", icon = Icons.Default.Paid)
+
+        Card(
+          modifier = Modifier.fillMaxWidth(),
+          shape = RoundedCornerShape(18.dp),
+          colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+          elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        ) {
+          Column(modifier = Modifier.padding(16.dp)) {
+            // Currency Selector Row
+            Row(
+              modifier = Modifier.fillMaxWidth(),
+              horizontalArrangement = Arrangement.SpaceBetween,
+              verticalAlignment = Alignment.CenterVertically
+            ) {
+              Row(
+                modifier = Modifier.weight(1f),
+                verticalAlignment = Alignment.CenterVertically
+              ) {
+                Box(
+                  modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(EmeraldPrimaryContainer),
+                  contentAlignment = Alignment.Center
+                ) {
+                  Icon(
+                    imageVector = Icons.Default.Paid,
+                    contentDescription = null,
+                    tint = EmeraldPrimary,
+                    modifier = Modifier.size(24.dp)
+                  )
+                }
+
+                Spacer(modifier = Modifier.width(12.dp))
+
+                Column {
+                  Text(
+                    text = "العملة الحالية",
+                    style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold)
+                  )
+                  Text(
+                    text = "${uiState.currencyName} (${uiState.currencySymbol})",
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                      color = EmeraldPrimary,
+                      fontWeight = FontWeight.SemiBold
+                    )
+                  )
+                }
+              }
+
+              OutlinedButton(
+                onClick = { showCurrencyDialog = true },
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier.testTag("change_currency_button")
+              ) {
+                Text("تغيير العملة")
+              }
+            }
+
+            HorizontalDivider(
+              modifier = Modifier.padding(vertical = 14.dp),
+              color = MaterialTheme.colorScheme.surfaceVariant
+            )
+
+            // Digits Type (Eastern vs Western)
+            Row(
+              verticalAlignment = Alignment.CenterVertically,
+              modifier = Modifier.padding(bottom = 6.dp)
+            ) {
+              Icon(
+                imageVector = Icons.Default.Pin,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(20.dp)
+              )
+              Spacer(modifier = Modifier.width(8.dp))
+              Text(
+                text = "نظام كتابة الأرقام في التطبيق",
+                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
+              )
+            }
+
+            // Radio 1: Western
+            Row(
+              modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(10.dp))
+                .clickable { viewModel.setDigitType(DigitType.WESTERN) }
+                .padding(vertical = 6.dp, horizontal = 4.dp),
+              verticalAlignment = Alignment.CenterVertically
+            ) {
+              RadioButton(
+                selected = uiState.digitType == DigitType.WESTERN,
+                onClick = { viewModel.setDigitType(DigitType.WESTERN) },
+                colors = RadioButtonDefaults.colors(selectedColor = EmeraldPrimary)
+              )
+              Spacer(modifier = Modifier.width(8.dp))
+              Column {
+                Text(
+                  text = "أرقام عربية غربية / لاتينية",
+                  style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold)
+                )
+                Text(
+                  text = "مثال: 1250.00 ${uiState.currencySymbol}",
+                  style = MaterialTheme.typography.bodySmall.copy(
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                  )
+                )
+              }
+            }
+
+            // Radio 2: Eastern (Hindi numerals)
+            Row(
+              modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(10.dp))
+                .clickable { viewModel.setDigitType(DigitType.EASTERN) }
+                .padding(vertical = 6.dp, horizontal = 4.dp),
+              verticalAlignment = Alignment.CenterVertically
+            ) {
+              RadioButton(
+                selected = uiState.digitType == DigitType.EASTERN,
+                onClick = { viewModel.setDigitType(DigitType.EASTERN) },
+                colors = RadioButtonDefaults.colors(selectedColor = EmeraldPrimary)
+              )
+              Spacer(modifier = Modifier.width(8.dp))
+              Column {
+                Text(
+                  text = "أرقام عربية مشرقية (هندية)",
+                  style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold)
+                )
+                Text(
+                  text = "مثال: ١٢٥٠.٠٠ ${uiState.currencySymbol}",
+                  style = MaterialTheme.typography.bodySmall.copy(
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                  )
+                )
+              }
+            }
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            // Live preview card
+            Surface(
+              shape = RoundedCornerShape(12.dp),
+              color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f),
+              modifier = Modifier.fillMaxWidth()
+            ) {
+              Row(
+                modifier = Modifier
+                  .fillMaxWidth()
+                  .padding(12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+              ) {
+                Text(
+                  text = "معاينة التنسيق المباشر:",
+                  style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium)
+                )
+                Text(
+                  text = NotificationHelper.formatAmountWithCurrency(1250.50, context),
+                  style = MaterialTheme.typography.bodyLarge.copy(
+                    fontWeight = FontWeight.Bold,
+                    color = EmeraldPrimary
+                  )
+                )
+              }
+            }
+          }
+        }
+
+        // Section 2: Security & Authentication
         SettingsSectionHeader(title = "الأمان والمصادقة", icon = Icons.Default.Security)
 
         Card(
@@ -295,7 +478,7 @@ fun SettingsScreen(
           }
         }
 
-        // Section 2: Backup & Restore (Google Drive / Storage SAF)
+        // Section 3: Backup & Restore (Google Drive / Storage SAF)
         SettingsSectionHeader(title = "النسخ الاحتياطي والاستعادة", icon = Icons.Default.Storage)
 
         Card(
@@ -305,14 +488,13 @@ fun SettingsScreen(
           elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
         ) {
           Column(modifier = Modifier.padding(16.dp)) {
-            // Explanation
             Text(
               text = "حفظ البيانات في Google Drive أو الذاكرة المحلية",
               style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-              text = "التطبيق يعمل بالكامل بدون إنترنت. عند الضغط على النسخ الاحتياطي، يمكنك اختيار مجلد 'Google Drive' المتزامن مع هاتفك ليتم رفع الملف تلقائياً، أو حفظه في مجلد التنزيلات.",
+              text = "التطبيق يعمل بالكامل بدون إنترنت. عند الضغط على النسخ الاحتياطي، يمكنك اختيار مجلد 'Google Drive' المتزامن مع هاتفك ليتم حفظ الملف تلقائياً، أو حفظه في مجلد التنزيلات.",
               style = MaterialTheme.typography.bodySmall.copy(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 lineHeight = 18.sp
@@ -324,7 +506,6 @@ fun SettingsScreen(
             // Export Button
             Button(
               onClick = {
-                // Open SAF Directory picker
                 backupFolderLauncher.launch(null)
               },
               modifier = Modifier
@@ -355,7 +536,6 @@ fun SettingsScreen(
             // Restore Button
             OutlinedButton(
               onClick = {
-                // Open SAF File picker
                 restoreFileLauncher.launch(arrayOf("application/json", "text/*", "*/*"))
               },
               modifier = Modifier
@@ -382,7 +562,7 @@ fun SettingsScreen(
           }
         }
 
-        // Section 3: App Info & Security Standards
+        // Section 4: App Info
         SettingsSectionHeader(title = "معلومات النظام والأمان", icon = Icons.Default.Info)
 
         Card(
@@ -394,12 +574,30 @@ fun SettingsScreen(
         ) {
           Column(modifier = Modifier.padding(16.dp)) {
             InfoRow(label = "اسم التطبيق", value = "صناديق الأمانات (SafeBox Vault)")
+            InfoRow(label = "العملة الأساسية", value = "${uiState.currencyName} (${uiState.currencySymbol})")
+            InfoRow(label = "نظام الأرقام", value = uiState.digitType.titleArabic)
             InfoRow(label = "الإصدار", value = "1.0.0 (Offline-First Secure)")
             InfoRow(label = "قاعدة البيانات", value = "Room SQLite (معاملات ذرية مشفرة)")
             InfoRow(label = "التشفير", value = "SHA-256 + Salt + Android Keystore")
             InfoRow(label = "التكامل", value = "Storage Access Framework (SAF) & Drive")
           }
         }
+      }
+
+      // Currency Selection Dialog
+      if (showCurrencyDialog) {
+        CurrencySelectionDialog(
+          currentCode = uiState.currencyCode,
+          onDismiss = { showCurrencyDialog = false },
+          onSelectCurrency = { item ->
+            viewModel.setCurrency(item.symbol, item.code, item.nameArabic)
+            showCurrencyDialog = false
+          },
+          onCustomCurrency = { symbol, name ->
+            viewModel.setCurrency(symbol, "CUSTOM", name)
+            showCurrencyDialog = false
+          }
+        )
       }
 
       // Change Password Dialog
@@ -437,7 +635,7 @@ fun SettingsScreen(
           text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
               Text(
-                text = "أنت على وشك استعادة نسخة احتياطية بتاريخ: ${NotificationHelper.formatDateTime(payload.exportedAt)}",
+                text = "أنت على وشك استعادة نسخة احتياطية بتاريخ: ${NotificationHelper.formatDateTime(payload.exportedAt, context)}",
                 style = MaterialTheme.typography.bodyMedium
               )
               Text(
@@ -474,6 +672,136 @@ fun SettingsScreen(
       }
     }
   }
+}
+
+@Composable
+fun CurrencySelectionDialog(
+  currentCode: String,
+  onDismiss: () -> Unit,
+  onSelectCurrency: (CurrencyItem) -> Unit,
+  onCustomCurrency: (symbol: String, name: String) -> Unit
+) {
+  var showCustomForm by remember { mutableStateOf(false) }
+  var customSymbol by remember { mutableStateOf("") }
+  var customName by remember { mutableStateOf("") }
+
+  AlertDialog(
+    onDismissRequest = onDismiss,
+    title = {
+      Text(
+        text = if (showCustomForm) "إدخال عملة مخصصة" else "اختيار العملة",
+        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
+      )
+    },
+    text = {
+      if (showCustomForm) {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+          OutlinedTextField(
+            value = customSymbol,
+            onValueChange = { customSymbol = it },
+            label = { Text("رمز العملة (مثال: د.ل أو LYD)") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth()
+          )
+          OutlinedTextField(
+            value = customName,
+            onValueChange = { customName = it },
+            label = { Text("اسم العملة (مثال: دينار ليبي)") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth()
+          )
+        }
+      } else {
+        LazyColumn(
+          modifier = Modifier
+            .fillMaxWidth()
+            .height(340.dp),
+          verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+          items(PREDEFINED_CURRENCIES) { item ->
+            val isSelected = currentCode == item.code
+            Surface(
+              shape = RoundedCornerShape(12.dp),
+              color = if (isSelected) EmeraldPrimaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+              modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onSelectCurrency(item) }
+            ) {
+              Row(
+                modifier = Modifier
+                  .fillMaxWidth()
+                  .padding(horizontal = 14.dp, vertical = 10.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+              ) {
+                Column {
+                  Text(
+                    text = item.nameArabic,
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                      fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                      color = if (isSelected) EmeraldPrimary else MaterialTheme.colorScheme.onSurface
+                    )
+                  )
+                  Text(
+                    text = item.code,
+                    style = MaterialTheme.typography.bodySmall.copy(
+                      fontSize = 11.sp,
+                      color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                  )
+                }
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                  Text(
+                    text = item.symbol,
+                    style = MaterialTheme.typography.titleMedium.copy(
+                      fontWeight = FontWeight.Bold,
+                      color = if (isSelected) EmeraldPrimary else MaterialTheme.colorScheme.onSurface
+                    )
+                  )
+                  if (isSelected) {
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Icon(
+                      imageVector = Icons.Default.Check,
+                      contentDescription = null,
+                      tint = EmeraldPrimary,
+                      modifier = Modifier.size(18.dp)
+                    )
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    confirmButton = {
+      if (showCustomForm) {
+        Button(
+          onClick = {
+            if (customSymbol.isNotBlank()) {
+              onCustomCurrency(
+                customSymbol.trim(),
+                if (customName.isBlank()) customSymbol.trim() else customName.trim()
+              )
+            }
+          },
+          colors = ButtonDefaults.buttonColors(containerColor = EmeraldPrimary)
+        ) {
+          Text("تطبيق العملة")
+        }
+      } else {
+        TextButton(onClick = { showCustomForm = true }) {
+          Text("عملة مخصصة أخرى...")
+        }
+      }
+    },
+    dismissButton = {
+      TextButton(onClick = onDismiss) {
+        Text("إلغاء")
+      }
+    }
+  )
 }
 
 @Composable

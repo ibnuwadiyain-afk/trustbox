@@ -8,6 +8,7 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
+import com.example.data.preferences.AppPreferences
 import com.example.data.repository.SafeBoxRepository
 import com.example.data.security.SecurityManager
 import com.example.ui.auth.AuthScreen
@@ -37,6 +38,7 @@ fun SafeBoxNavGraph(
   navController: NavHostController,
   repository: SafeBoxRepository,
   securityManager: SecurityManager,
+  appPreferences: AppPreferences,
   modifier: Modifier = Modifier
 ) {
   val authViewModel: AuthViewModel = viewModel(
@@ -102,7 +104,7 @@ fun SafeBoxNavGraph(
 
     composable(Destinations.SETTINGS) {
       val settingsViewModel: SettingsViewModel = viewModel(
-        factory = SettingsViewModelFactory(securityManager, repository)
+        factory = SettingsViewModelFactory(securityManager, repository, appPreferences)
       )
 
       SettingsScreen(

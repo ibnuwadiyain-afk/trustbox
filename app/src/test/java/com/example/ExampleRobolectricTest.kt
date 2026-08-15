@@ -7,6 +7,8 @@ import com.example.data.local.db.SafeBoxDatabase
 import com.example.data.local.entity.ClientEntity
 import com.example.data.local.entity.TransactionEntity
 import com.example.data.notification.NotificationHelper
+import com.example.data.preferences.AppPreferences
+import com.example.data.preferences.DigitType
 import com.example.data.repository.SafeBoxRepository
 import com.example.data.security.SecurityManager
 import com.example.domain.model.Client
@@ -30,6 +32,7 @@ class ExampleRobolectricTest {
   private lateinit var database: SafeBoxDatabase
   private lateinit var repository: SafeBoxRepository
   private lateinit var securityManager: SecurityManager
+  private lateinit var appPreferences: AppPreferences
 
   @Before
   fun setup() {
@@ -37,6 +40,7 @@ class ExampleRobolectricTest {
     database = SafeBoxDatabase.createInMemory(context)
     repository = SafeBoxRepository(database)
     securityManager = SecurityManager(context)
+    appPreferences = AppPreferences.getInstance(context)
   }
 
   @Test
@@ -51,6 +55,40 @@ class ExampleRobolectricTest {
     assertTrue(securityManager.setMasterPassword(pass))
     assertTrue(securityManager.verifyPassword("1234"))
     assertFalse(securityManager.verifyPassword("0000"))
+  }
+
+  @Test
+  fun `test default currency is Libyan Dinar and changeable`() {
+    appPreferences.setCurrency("د.ل", "LYD", "دينار ليبي")
+    assertEquals("د.ل", appPreferences.state.value.currencySymbol)
+    assertEquals("LYD", appPreferences.state.value.currencyCode)
+
+    val formatted = NotificationHelper.formatAmountWithCurrency(100.0, context)
+    assertTrue(formatted.contains("د.ل"))
+
+    // Change to USD
+    appPreferences.setCurrency("$", "USD", "دولار أمريكي")
+    assertEquals("$", appPreferences.state.value.currencySymbol)
+    val formattedUsd = NotificationHelper.formatAmountWithCurrency(100.0, context)
+    assertTrue(formattedUsd.contains("$"))
+
+    // Reset back to LYD
+    appPreferences.setCurrency("د.ل", "LYD", "دينار ليبي")
+  }
+
+  @Test
+  fun `test eastern arabic numerals conversion`() {
+    appPreferences.setDigitType(DigitType.EASTERN)
+    val converted = appPreferences.formatDigits("1234567890")
+    assertEquals("١٢٣٤٥٦٧٨٩٠", converted)
+
+    val formattedMoney = NotificationHelper.formatAmountWithCurrency(150.5, context)
+    assertTrue(formattedMoney.contains("١٥٠"))
+
+    // Switch to Western
+    appPreferences.setDigitType(DigitType.WESTERN)
+    val western = appPreferences.formatDigits("1234567890")
+    assertEquals("1234567890", western)
   }
 
   @Test
@@ -88,7 +126,8 @@ class ExampleRobolectricTest {
       clientName = "محمد",
       amount = 150.0,
       remainingBalance = 350.0,
-      timestamp = 1700000000000L
+      timestamp = 1700000000000L,
+      context = context
     )
     assertTrue(withdrawalMessage.contains("السيد/ة محمد"))
     assertTrue(withdrawalMessage.contains("تم سحب"))
@@ -108,4 +147,3 @@ class ExampleRobolectricTest {
     assertEquals(0, clients.size)
   }
 }
-

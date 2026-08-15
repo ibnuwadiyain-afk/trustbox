@@ -23,8 +23,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ArrowDownward
-import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
@@ -88,7 +86,6 @@ import com.example.ui.theme.EmeraldPrimary
 import com.example.ui.theme.EmeraldPrimaryContainer
 import com.example.ui.theme.GoldTertiary
 import com.example.ui.theme.VaultNavy
-import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -102,7 +99,6 @@ fun ClientListScreen(
   val uiState by viewModel.uiState.collectAsState()
   val context = LocalContext.current
   val snackbarHostState = remember { SnackbarHostState() }
-  val scope = rememberCoroutineScope()
 
   var showAddDialog by remember { mutableStateOf(false) }
   var clientToEdit by remember { mutableStateOf<Client?>(null) }
@@ -360,6 +356,8 @@ fun VaultSummaryCard(
   totalBalance: Double,
   totalClients: Int
 ) {
+  val context = LocalContext.current
+
   Card(
     modifier = Modifier
       .fillMaxWidth()
@@ -394,7 +392,7 @@ fun VaultSummaryCard(
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-              text = "${NotificationHelper.formatCurrency(totalBalance)} ر.س",
+              text = NotificationHelper.formatAmountWithCurrency(totalBalance, context),
               style = MaterialTheme.typography.headlineMedium.copy(
                 fontWeight = FontWeight.Bold,
                 color = Color.White
@@ -433,7 +431,7 @@ fun VaultSummaryCard(
             )
             Spacer(modifier = Modifier.width(6.dp))
             Text(
-              text = "إجمالي الصناديق النشطة: $totalClients",
+              text = "إجمالي الصناديق النشطة: ${NotificationHelper.formatDigits(totalClients.toString(), context)}",
               style = MaterialTheme.typography.bodySmall.copy(
                 color = Color.White.copy(alpha = 0.9f),
                 fontWeight = FontWeight.Medium
@@ -462,6 +460,8 @@ fun ClientItemCard(
   onDelete: () -> Unit,
   onWhatsAppClick: () -> Unit
 ) {
+  val context = LocalContext.current
+
   Card(
     modifier = Modifier
       .fillMaxWidth()
@@ -510,7 +510,7 @@ fun ClientItemCard(
               color = MaterialTheme.colorScheme.secondaryContainer
             ) {
               Text(
-                text = "صندوق #${client.boxNumber}",
+                text = "صندوق #${NotificationHelper.formatDigits(client.boxNumber, context)}",
                 style = MaterialTheme.typography.bodySmall.copy(
                   fontSize = 11.sp,
                   fontWeight = FontWeight.SemiBold,
@@ -526,7 +526,7 @@ fun ClientItemCard(
 
         if (client.phone.isNotBlank()) {
           Text(
-            text = client.phone,
+            text = NotificationHelper.formatDigits(client.phone, context),
             style = MaterialTheme.typography.bodySmall.copy(
               color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -536,7 +536,7 @@ fun ClientItemCard(
         Spacer(modifier = Modifier.height(4.dp))
 
         Text(
-          text = "الرصيد: ${NotificationHelper.formatCurrency(client.balance)} ر.س",
+          text = "الرصيد: ${NotificationHelper.formatAmountWithCurrency(client.balance, context)}",
           style = MaterialTheme.typography.bodyMedium.copy(
             fontWeight = FontWeight.Bold,
             color = if (client.balance > 0) DepositGreen else MaterialTheme.colorScheme.onSurface

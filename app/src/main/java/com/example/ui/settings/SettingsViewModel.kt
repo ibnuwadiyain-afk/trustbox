@@ -6,6 +6,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.data.backup.BackupManager
+import com.example.data.preferences.AppPreferences
+import com.example.data.preferences.DigitType
 import com.example.data.repository.SafeBoxRepository
 import com.example.data.security.SecurityManager
 import com.example.domain.model.BackupPayload
@@ -17,6 +19,10 @@ import kotlinx.coroutines.launch
 data class SettingsUiState(
   val isBiometricEnabled: Boolean = false,
   val canUseBiometric: Boolean = false,
+  val currencySymbol: String = "د.ل",
+  val currencyCode: String = "LYD",
+  val currencyName: String = "دينار ليبي",
+  val digitType: DigitType = DigitType.WESTERN,
   val isExporting: Boolean = false,
   val isImporting: Boolean = false,
   val exportSuccessMessage: String? = null,
@@ -28,16 +34,48 @@ data class SettingsUiState(
 
 class SettingsViewModel(
   private val securityManager: SecurityManager,
-  private val repository: SafeBoxRepository
+  private val repository: SafeBoxRepository,
+  private val appPreferences: AppPreferences
 ) : ViewModel() {
 
   private val _uiState = MutableStateFlow(
     SettingsUiState(
       isBiometricEnabled = securityManager.isBiometricEnabled(),
-      canUseBiometric = securityManager.canUseBiometric()
+      canUseBiometric = securityManager.canUseBiometric(),
+      currencySymbol = appPreferences.state.value.currencySymbol,
+      currencyCode = appPreferences.state.value.currencyCode,
+      currencyName = appPreferences.state.value.currencyName,
+      digitType = appPreferences.state.value.digitType
     )
   )
   val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
+
+  init {
+    viewModelScope.launch {
+      appPreferences.state.collect { prefState ->
+        _uiState.value = _uiState.value.copy(
+          currencySymbol = prefState.currencySymbol,
+          currencyCode = prefState.currencyCode,
+          currencyName = prefState.currencyName,
+          digitType = prefState.digitType
+        )
+      }
+    }
+  }
+
+  fun setCurrency(symbol: String, code: String, name: String) {
+    appPreferences.setCurrency(symbol, code, name)
+    _uiState.value = _uiState.value.copy(
+      exportSuccessMessage = "تم تغيير العملة إلى: $name ($symbol)"
+    )
+  }
+
+  fun setDigitType(type: DigitType) {
+    appPreferences.setDigitType(type)
+    _uiState.value = _uiState.value.copy(
+      exportSuccessMessage = "تم تعيين نظام الأرقام: ${type.titleArabic}"
+    )
+  }
 
   fun refreshSecurityState() {
     _uiState.value = _uiState.value.copy(
@@ -188,10 +226,11 @@ class SettingsViewModel(
 
 class SettingsViewModelFactory(
   private val securityManager: SecurityManager,
-  private val repository: SafeBoxRepository
+  private val repository: SafeBoxRepository,
+  private val appPreferences: AppPreferences
 ) : ViewModelProvider.Factory {
   @Suppress("UNCHECKED_CAST")
   override fun <T : ViewModel> create(modelClass: Class<T>): T {
-    return SettingsViewModel(securityManager, repository) as T
+    return SettingsViewModel(securityManager, repository, appPreferences) as T
   }
 }

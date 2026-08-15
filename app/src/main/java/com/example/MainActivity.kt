@@ -29,7 +29,8 @@ class MainActivity : FragmentActivity() {
           SafeBoxNavGraph(
             navController = navController,
             repository = app.repository,
-            securityManager = app.securityManager
+            securityManager = app.securityManager,
+            appPreferences = app.appPreferences
           )
         }
       }

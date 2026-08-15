@@ -4,7 +4,6 @@ import android.Manifest
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
-import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -28,24 +27,19 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Message
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Phone
-import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -85,7 +79,6 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.content.ContextCompat
 import com.example.data.notification.NotificationHelper
 import com.example.domain.model.Client
 import com.example.domain.model.TransactionRecord
@@ -116,7 +109,6 @@ fun ClientDetailScreen(
   var showEditDialog by remember { mutableStateOf(false) }
   var activeNotificationPrompt by remember { mutableStateOf<NotificationPromptData?>(null) }
 
-  // Listen to post-withdrawal notification event
   LaunchedEffect(Unit) {
     viewModel.notificationPrompt.collect { promptData ->
       activeNotificationPrompt = promptData
@@ -148,7 +140,6 @@ fun ClientDetailScreen(
           onFailure = { err -> scope.launch { snackbarHostState.showSnackbar(err.localizedMessage ?: "فشل الإرسال") } }
         )
       } else {
-        // Fallback to opening SMS app
         NotificationHelper.openSmsApp(context, prompt.phone, prompt.preformattedMessage)
       }
     }
@@ -272,7 +263,7 @@ fun ClientDetailScreen(
             )
             Spacer(modifier = Modifier.width(8.dp))
             Text(
-              text = "سجل العمليات المالية (${uiState.transactions.size})",
+              text = "سجل العمليات المالية (${NotificationHelper.formatDigits(uiState.transactions.size.toString(), context)})",
               style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
               color = MaterialTheme.colorScheme.onBackground
             )
@@ -448,6 +439,8 @@ fun ClientHeaderCard(
   client: Client,
   onWhatsAppClick: () -> Unit
 ) {
+  val context = LocalContext.current
+
   Card(
     modifier = Modifier
       .fillMaxWidth()
@@ -492,7 +485,7 @@ fun ClientHeaderCard(
                 color = Color.White.copy(alpha = 0.2f)
               ) {
                 Text(
-                  text = "رقم الصندوق: #${client.boxNumber}",
+                  text = "رقم الصندوق: #${NotificationHelper.formatDigits(client.boxNumber, context)}",
                   style = MaterialTheme.typography.bodySmall.copy(
                     fontWeight = FontWeight.SemiBold,
                     color = Color.White
@@ -505,7 +498,7 @@ fun ClientHeaderCard(
             if (client.phone.isNotBlank()) {
               Spacer(modifier = Modifier.height(6.dp))
               Text(
-                text = client.phone,
+                text = NotificationHelper.formatDigits(client.phone, context),
                 style = MaterialTheme.typography.bodyMedium.copy(
                   color = Color.White.copy(alpha = 0.85f)
                 )
@@ -548,7 +541,7 @@ fun ClientHeaderCard(
             )
             Spacer(modifier = Modifier.height(2.dp))
             Text(
-              text = "${NotificationHelper.formatCurrency(client.balance)} ر.س",
+              text = NotificationHelper.formatAmountWithCurrency(client.balance, context),
               style = MaterialTheme.typography.headlineMedium.copy(
                 fontWeight = FontWeight.Bold,
                 color = Color.White
@@ -575,6 +568,7 @@ fun ClientHeaderCard(
 
 @Composable
 fun TransactionItemCard(tx: TransactionRecord) {
+  val context = LocalContext.current
   val isDeposit = tx.type == TransactionType.DEPOSIT
 
   Card(
@@ -622,7 +616,7 @@ fun TransactionItemCard(tx: TransactionRecord) {
           )
 
           Text(
-            text = "${if (isDeposit) "+" else "-"} ${NotificationHelper.formatCurrency(tx.amount)} ر.س",
+            text = "${if (isDeposit) "+" else "-"} ${NotificationHelper.formatAmountWithCurrency(tx.amount, context)}",
             style = MaterialTheme.typography.titleMedium.copy(
               fontWeight = FontWeight.Bold,
               color = if (isDeposit) DepositGreen else WithdrawalRed
@@ -637,7 +631,7 @@ fun TransactionItemCard(tx: TransactionRecord) {
           horizontalArrangement = Arrangement.SpaceBetween
         ) {
           Text(
-            text = "الرصيد بعد الحركة: ${NotificationHelper.formatCurrency(tx.newBalance)} ر.س",
+            text = "الرصيد بعد الحركة: ${NotificationHelper.formatAmountWithCurrency(tx.newBalance, context)}",
             style = MaterialTheme.typography.bodySmall.copy(
               color = MaterialTheme.colorScheme.onSurfaceVariant,
               fontWeight = FontWeight.Medium
@@ -645,7 +639,7 @@ fun TransactionItemCard(tx: TransactionRecord) {
           )
 
           Text(
-            text = NotificationHelper.formatDateTime(tx.timestamp),
+            text = NotificationHelper.formatDateTime(tx.timestamp, context),
             style = MaterialTheme.typography.bodySmall.copy(
               fontSize = 11.sp,
               color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -678,6 +672,7 @@ fun TransactionActionDialog(
   onDismiss: () -> Unit,
   onConfirm: (amount: Double, note: String) -> Unit
 ) {
+  val context = LocalContext.current
   var amountStr by remember { mutableStateOf("") }
   var note by remember { mutableStateOf("") }
   var errorMessage by remember { mutableStateOf<String?>(null) }
@@ -699,7 +694,7 @@ fun TransactionActionDialog(
         verticalArrangement = Arrangement.spacedBy(10.dp)
       ) {
         Text(
-          text = "الرصيد الحالي: ${NotificationHelper.formatCurrency(currentBalance)} ر.س",
+          text = "الرصيد الحالي: ${NotificationHelper.formatAmountWithCurrency(currentBalance, context)}",
           style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold)
         )
 
@@ -739,7 +734,7 @@ fun TransactionActionDialog(
                 style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium)
               )
               Text(
-                text = "${NotificationHelper.formatCurrency(calculatedBalance)} ر.س",
+                text = NotificationHelper.formatAmountWithCurrency(calculatedBalance, context),
                 style = MaterialTheme.typography.bodySmall.copy(
                   fontWeight = FontWeight.Bold,
                   color = if (isWithdrawal && amount > currentBalance)

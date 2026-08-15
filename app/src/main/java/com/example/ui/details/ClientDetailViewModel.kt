@@ -14,7 +14,6 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -91,7 +90,7 @@ class ClientDetailViewModel(
 
       result.fold(
         onSuccess = { tx ->
-          _successMessage.value = "تمت عملية الإيداع بنجاح بمبلغ ${NotificationHelper.formatCurrency(amount)}"
+          _successMessage.value = "تمت عملية الإيداع بنجاح بمبلغ ${NotificationHelper.formatAmountWithCurrency(amount)}"
           val currentClient = repository.getClientByIdDirect(clientId)
           if (currentClient != null && currentClient.phone.isNotBlank()) {
             val message = NotificationHelper.buildDepositMessage(
@@ -139,7 +138,7 @@ class ClientDetailViewModel(
 
       if (amount > currentClient.balance) {
         _isProcessing.value = false
-        _errorMessage.value = "عفواً! الرصيد المتاح (${NotificationHelper.formatCurrency(currentClient.balance)}) لا يكفي لسحب ${NotificationHelper.formatCurrency(amount)}"
+        _errorMessage.value = "عفواً! الرصيد المتاح (${NotificationHelper.formatAmountWithCurrency(currentClient.balance)}) لا يكفي لسحب ${NotificationHelper.formatAmountWithCurrency(amount)}"
         return@launch
       }
 
@@ -148,7 +147,7 @@ class ClientDetailViewModel(
 
       result.fold(
         onSuccess = { tx ->
-          _successMessage.value = "تمت عملية السحب بنجاح بمبلغ ${NotificationHelper.formatCurrency(amount)}"
+          _successMessage.value = "تمت عملية السحب بنجاح بمبلغ ${NotificationHelper.formatAmountWithCurrency(amount)}"
           if (currentClient.phone.isNotBlank()) {
             val message = NotificationHelper.buildWithdrawalMessage(
               clientName = currentClient.name,
