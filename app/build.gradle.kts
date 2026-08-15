@@ -28,12 +28,9 @@ android {
       keyAlias = "upload"
       keyPassword = System.getenv("KEY_PASSWORD")
     }
-    create("debugConfig") {
-      storeFile = file("${rootDir}/debug.keystore")
-      storePassword = "android"
-      keyAlias = "androiddebugkey"
-      keyPassword = "android"
-    }
+    // REMOVED: custom "debugConfig" block.
+    // The Android Gradle Plugin automatically uses the built-in debug keystore 
+    // (~/.android/debug.keystore) on both local machines and CI runners (like GitHub Actions).
   }
 
   buildTypes {
@@ -43,7 +40,10 @@ android {
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
       signingConfig = signingConfigs.getByName("release")
     }
-    debug { signingConfig = signingConfigs.getByName("debugConfig") }
+    debug {
+      // REMOVED: signingConfig = signingConfigs.getByName("debugConfig")
+      // No signing config specified = uses the default system debug keystore automatically.
+    }
   }
   compileOptions {
     sourceCompatibility = JavaVersion.VERSION_11
