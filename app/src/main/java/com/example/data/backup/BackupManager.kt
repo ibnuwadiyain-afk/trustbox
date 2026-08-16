@@ -105,6 +105,57 @@ object BackupManager {
     }
   }
 
+  /**
+   * Saves backup data directly into a local cache/files directory and returns the File
+   */
+  suspend fun saveBackupToFile(
+    context: Context,
+    clients: List<ClientEntity>,
+    transactions: List<TransactionEntity>
+  ): Result<java.io.File> = withContext(Dispatchers.IO) {
+    try {
+      val backupDir = java.io.File(context.cacheDir, "backups").apply { mkdirs() }
+      val timestamp = fileDateFormat.format(Date())
+      val fileName = "SafeBox_Backup_$timestamp.json"
+      val file = java.io.File(backupDir, fileName)
+
+      val jsonString = exportDataToJson(clients, transactions)
+      java.io.FileOutputStream(file).use { outputStream ->
+        outputStream.write(jsonString.toByteArray(Charsets.UTF_8))
+        outputStream.flush()
+      }
+
+      Result.success(file)
+    } catch (e: Exception) {
+      Result.failure(Exception("فشل إنشاء ملف النسخة الاحتياطية: ${e.localizedMessage}"))
+    }
+  }
+
+  /**
+   * Shares a JSON Backup file using Android system Share sheet via FileProvider
+   */
+  fun shareBackupFile(context: Context, file: java.io.File) {
+    try {
+      val uri = androidx.core.content.FileProvider.getUriForFile(
+        context,
+        "${context.packageName}.fileprovider",
+        file
+      )
+      val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+        type = "application/json"
+        putExtra(android.content.Intent.EXTRA_STREAM, uri)
+        putExtra(android.content.Intent.EXTRA_SUBJECT, "نسخة احتياطية - صناديق الأمانات")
+        addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+      }
+      val chooser = android.content.Intent.createChooser(intent, "مشاركة / حفظ النسخة الاحتياطية").apply {
+        addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+      }
+      context.startActivity(chooser)
+    } catch (e: Exception) {
+      android.widget.Toast.makeText(context, "تعذر مشاركة ملف النسخة: ${e.localizedMessage}", android.widget.Toast.LENGTH_LONG).show()
+    }
+  }
+
   suspend fun readAndValidateBackup(
     fileUri: Uri,
     context: Context

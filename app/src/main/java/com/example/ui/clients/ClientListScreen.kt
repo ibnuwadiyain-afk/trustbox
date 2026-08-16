@@ -1,5 +1,9 @@
 package com.example.ui.clients
 
+import android.net.Uri
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -24,6 +28,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.ContactPhone
+import androidx.compose.material.icons.filled.Contacts
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Inbox
@@ -86,6 +92,7 @@ import com.example.ui.theme.EmeraldPrimary
 import com.example.ui.theme.EmeraldPrimaryContainer
 import com.example.ui.theme.GoldTertiary
 import com.example.ui.theme.VaultNavy
+import com.example.util.ContactPickerHelper
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -643,12 +650,28 @@ fun AddEditClientDialog(
   onDismiss: () -> Unit,
   onSave: (name: String, phone: String, boxNumber: String, initialBalance: Double, notes: String) -> Unit
 ) {
+  val context = LocalContext.current
   var name by remember { mutableStateOf(client?.name ?: "") }
   var phone by remember { mutableStateOf(client?.phone ?: "") }
   var boxNumber by remember { mutableStateOf(client?.boxNumber ?: "") }
   var initialBalanceStr by remember { mutableStateOf(if (client == null) "" else client.balance.toString()) }
   var notes by remember { mutableStateOf(client?.notes ?: "") }
   var errorMessage by remember { mutableStateOf<String?>(null) }
+
+  val contactPickerLauncher = rememberLauncherForActivityResult(
+    contract = ActivityResultContracts.PickContact()
+  ) { uri: Uri? ->
+    uri?.let {
+      val contactData = ContactPickerHelper.extractContactData(context, it)
+      if (!contactData.phoneNumber.isNullOrBlank()) {
+        phone = contactData.phoneNumber
+      }
+      if (name.isBlank() && !contactData.name.isNullOrBlank()) {
+        name = contactData.name
+        errorMessage = null
+      }
+    }
+  }
 
   AlertDialog(
     onDismissRequest = onDismiss,
@@ -678,18 +701,76 @@ fun AddEditClientDialog(
             .testTag("client_name_input")
         )
 
-        OutlinedTextField(
-          value = phone,
-          onValueChange = { phone = it },
-          label = { Text("رقم الهاتف (لإشعارات واتساب و SMS)") },
-          placeholder = { Text("مثال: 966501234567") },
-          keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-          singleLine = true,
-          shape = RoundedCornerShape(12.dp),
-          modifier = Modifier
-            .fillMaxWidth()
-            .testTag("client_phone_input")
-        )
+        Column(modifier = Modifier.fillMaxWidth()) {
+          OutlinedTextField(
+            value = phone,
+            onValueChange = { phone = it },
+            label = { Text("رقم الهاتف (لواتساب و SMS)") },
+            placeholder = { Text("مثال: 0912345678") },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+            singleLine = true,
+            shape = RoundedCornerShape(12.dp),
+            trailingIcon = {
+              IconButton(
+                onClick = {
+                  try {
+                    contactPickerLauncher.launch(null)
+                  } catch (e: Exception) {
+                    Toast.makeText(context, "تعذر فتح دليل الهاتف: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+                  }
+                },
+                modifier = Modifier.testTag("pick_contact_icon_button")
+              ) {
+                Icon(
+                  imageVector = Icons.Default.ContactPhone,
+                  contentDescription = "اختيار من دليل الهاتف",
+                  tint = EmeraldPrimary
+                )
+              }
+            },
+            modifier = Modifier
+              .fillMaxWidth()
+              .testTag("client_phone_input")
+          )
+
+          Spacer(modifier = Modifier.height(4.dp))
+
+          Surface(
+            onClick = {
+              try {
+                contactPickerLauncher.launch(null)
+              } catch (e: Exception) {
+                Toast.makeText(context, "تعذر فتح دليل الهاتف: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+              }
+            },
+            shape = RoundedCornerShape(8.dp),
+            color = EmeraldPrimaryContainer.copy(alpha = 0.5f),
+            modifier = Modifier
+              .align(Alignment.Start)
+              .testTag("pick_contact_action_chip")
+          ) {
+            Row(
+              verticalAlignment = Alignment.CenterVertically,
+              modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+            ) {
+              Icon(
+                imageVector = Icons.Default.Contacts,
+                contentDescription = null,
+                tint = EmeraldPrimary,
+                modifier = Modifier.size(14.dp)
+              )
+              Spacer(modifier = Modifier.width(6.dp))
+              Text(
+                text = "اختيار من دليل الهاتف",
+                style = MaterialTheme.typography.bodySmall.copy(
+                  fontSize = 11.sp,
+                  fontWeight = FontWeight.SemiBold,
+                  color = EmeraldPrimary
+                )
+              )
+            }
+          }
+        }
 
         OutlinedTextField(
           value = boxNumber,

@@ -77,20 +77,20 @@ class SettingsViewModel(
   }
 
   fun exportAllClientsPdf(fileUri: Uri, context: Context) {
-    viewModelScope.launch {
+    viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
       _uiState.value = _uiState.value.copy(
         isExportingPdf = true,
         errorMessage = null,
         exportSuccessMessage = null
       )
 
-      val clients = repository.getAllClientsEntities()
       try {
+        val clients = repository.getAllClientsEntities()
         val outputStream = context.contentResolver.openOutputStream(fileUri)
         if (outputStream == null) {
           _uiState.value = _uiState.value.copy(
             isExportingPdf = false,
-            errorMessage = "تعذر فتح الملف لحفظ تقرير PDF"
+            errorMessage = "تعذر فتح الملف المحدد لكتابة مستند PDF"
           )
           return@launch
         }
@@ -106,12 +106,12 @@ class SettingsViewModel(
           result.fold(
             onSuccess = {
               _uiState.value = _uiState.value.copy(
-                exportSuccessMessage = "تم تصدير تقرير الخزينة العام بصيغة PDF بنجاح"
+                exportSuccessMessage = "تم حفظ تقرير الخزينة العام (PDF) بنجاح"
               )
             },
             onFailure = { err ->
               _uiState.value = _uiState.value.copy(
-                errorMessage = "فشل تصدير التقرير: ${err.localizedMessage}"
+                errorMessage = "فشل إنشاء مستند PDF: ${err.localizedMessage}"
               )
             }
           )
@@ -120,6 +120,76 @@ class SettingsViewModel(
         _uiState.value = _uiState.value.copy(
           isExportingPdf = false,
           errorMessage = "حدث خطأ أثناء تصدير PDF: ${e.localizedMessage}"
+        )
+      }
+    }
+  }
+
+  fun exportAllClientsPdfDirectShare(context: Context) {
+    viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+      _uiState.value = _uiState.value.copy(
+        isExportingPdf = true,
+        errorMessage = null,
+        exportSuccessMessage = null
+      )
+
+      try {
+        val clients = repository.getAllClientsEntities()
+        val result = PdfReportGenerator.generateAllClientsReportToFile(context, clients)
+        _uiState.value = _uiState.value.copy(isExportingPdf = false)
+
+        result.fold(
+          onSuccess = { file ->
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+              PdfReportGenerator.sharePdfFile(context, file, "تقرير صناديق الأمانات والخزينة")
+            }
+          },
+          onFailure = { err ->
+            _uiState.value = _uiState.value.copy(
+              errorMessage = "فشل إنشاء ملف التقرير: ${err.localizedMessage}"
+            )
+          }
+        )
+      } catch (e: Exception) {
+        _uiState.value = _uiState.value.copy(
+          isExportingPdf = false,
+          errorMessage = "حدث خطأ: ${e.localizedMessage}"
+        )
+      }
+    }
+  }
+
+  fun exportBackupDirectShare(context: Context) {
+    viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+      _uiState.value = _uiState.value.copy(
+        isExporting = true,
+        errorMessage = null,
+        exportSuccessMessage = null
+      )
+
+      try {
+        val clients = repository.getAllClientsEntities()
+        val transactions = repository.getAllTransactionsEntities()
+        val result = BackupManager.saveBackupToFile(context, clients, transactions)
+
+        _uiState.value = _uiState.value.copy(isExporting = false)
+
+        result.fold(
+          onSuccess = { file ->
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+              BackupManager.shareBackupFile(context, file)
+            }
+          },
+          onFailure = { err ->
+            _uiState.value = _uiState.value.copy(
+              errorMessage = "فشل إنشاء ملف النسخة: ${err.localizedMessage}"
+            )
+          }
+        )
+      } catch (e: Exception) {
+        _uiState.value = _uiState.value.copy(
+          isExporting = false,
+          errorMessage = "حدث خطأ أثناء إنشاء النسخة: ${e.localizedMessage}"
         )
       }
     }

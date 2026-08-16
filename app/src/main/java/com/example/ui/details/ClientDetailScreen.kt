@@ -4,6 +4,8 @@ import android.Manifest
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.net.Uri
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -29,6 +31,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.ContactPhone
+import androidx.compose.material.icons.filled.Contacts
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.History
@@ -41,6 +45,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -91,6 +96,7 @@ import com.example.ui.theme.EmeraldPrimaryContainer
 import com.example.ui.theme.VaultNavy
 import com.example.ui.theme.WithdrawalRed
 import com.example.ui.theme.WithdrawalRedLight
+import com.example.util.ContactPickerHelper
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -177,13 +183,23 @@ fun ClientDetailScreen(
           actions = {
             IconButton(
               onClick = {
-                val clientNameSafe = (uiState.client?.name ?: "client").replace(" ", "_")
-                val filename = "كشف_حساب_${clientNameSafe}_${System.currentTimeMillis()}.pdf"
-                createPdfLauncher.launch(filename)
+                try {
+                  viewModel.exportStatementPdfDirectShare(context)
+                } catch (e: Exception) {
+                  scope.launch { snackbarHostState.showSnackbar("حدث خطأ: ${e.localizedMessage}") }
+                }
               },
               modifier = Modifier.testTag("export_client_pdf_button")
             ) {
-              Icon(Icons.Default.PictureAsPdf, contentDescription = "تصدير كشف حساب PDF")
+              if (uiState.isExportingPdf) {
+                CircularProgressIndicator(
+                  modifier = Modifier.size(20.dp),
+                  color = EmeraldPrimary,
+                  strokeWidth = 2.dp
+                )
+              } else {
+                Icon(Icons.Default.PictureAsPdf, contentDescription = "مشاركة / فتح كشف حساب PDF")
+              }
             }
             IconButton(
               onClick = { showEditDialog = true },
@@ -359,38 +375,115 @@ fun ClientDetailScreen(
         var boxNumber by remember { mutableStateOf(client.boxNumber) }
         var notes by remember { mutableStateOf(client.notes) }
 
+        val contactPickerLauncher = rememberLauncherForActivityResult(
+          contract = ActivityResultContracts.PickContact()
+        ) { uri: Uri? ->
+          uri?.let {
+            val contactData = ContactPickerHelper.extractContactData(context, it)
+            if (!contactData.phoneNumber.isNullOrBlank()) {
+              phone = contactData.phoneNumber
+            }
+            if (name.isBlank() && !contactData.name.isNullOrBlank()) {
+              name = contactData.name
+            }
+          }
+        }
+
         AlertDialog(
           onDismissRequest = { showEditDialog = false },
           title = { Text("تعديل بيانات العميل") },
           text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
               OutlinedTextField(
                 value = name,
                 onValueChange = { name = it },
-                label = { Text("اسم العميل") },
+                label = { Text("اسم العميل *") },
                 singleLine = true,
+                shape = RoundedCornerShape(12.dp),
                 modifier = Modifier.fillMaxWidth()
               )
-              OutlinedTextField(
-                value = phone,
-                onValueChange = { phone = it },
-                label = { Text("رقم الهاتف") },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
-              )
+
+              Column(modifier = Modifier.fillMaxWidth()) {
+                OutlinedTextField(
+                  value = phone,
+                  onValueChange = { phone = it },
+                  label = { Text("رقم الهاتف (لواتساب و SMS)") },
+                  placeholder = { Text("مثال: 0912345678") },
+                  keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                  singleLine = true,
+                  shape = RoundedCornerShape(12.dp),
+                  trailingIcon = {
+                    IconButton(
+                      onClick = {
+                        try {
+                          contactPickerLauncher.launch(null)
+                        } catch (e: Exception) {
+                          Toast.makeText(context, "تعذر فتح دليل الهاتف: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+                        }
+                      }
+                    ) {
+                      Icon(
+                        imageVector = Icons.Default.ContactPhone,
+                        contentDescription = "اختيار من دليل الهاتف",
+                        tint = EmeraldPrimary
+                      )
+                    }
+                  },
+                  modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                Surface(
+                  onClick = {
+                    try {
+                      contactPickerLauncher.launch(null)
+                    } catch (e: Exception) {
+                      Toast.makeText(context, "تعذر فتح دليل الهاتف: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+                    }
+                  },
+                  shape = RoundedCornerShape(8.dp),
+                  color = EmeraldPrimaryContainer.copy(alpha = 0.5f),
+                  modifier = Modifier.align(Alignment.Start)
+                ) {
+                  Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                  ) {
+                    Icon(
+                      imageVector = Icons.Default.Contacts,
+                      contentDescription = null,
+                      tint = EmeraldPrimary,
+                      modifier = Modifier.size(14.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                      text = "اختيار من دليل الهاتف",
+                      style = MaterialTheme.typography.bodySmall.copy(
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = EmeraldPrimary
+                      )
+                    )
+                  }
+                }
+              }
+
               OutlinedTextField(
                 value = boxNumber,
                 onValueChange = { boxNumber = it },
                 label = { Text("رقم الصندوق") },
                 singleLine = true,
+                shape = RoundedCornerShape(12.dp),
                 modifier = Modifier.fillMaxWidth()
               )
+
               OutlinedTextField(
                 value = notes,
                 onValueChange = { notes = it },
                 label = { Text("ملاحظات") },
                 maxLines = 3,
+                shape = RoundedCornerShape(12.dp),
                 modifier = Modifier.fillMaxWidth()
               )
             }
@@ -401,6 +494,7 @@ fun ClientDetailScreen(
                 viewModel.updateClientInfo(name, phone, boxNumber, notes)
                 showEditDialog = false
               },
+              shape = RoundedCornerShape(10.dp),
               colors = ButtonDefaults.buttonColors(containerColor = EmeraldPrimary)
             ) {
               Text("حفظ التعديلات")

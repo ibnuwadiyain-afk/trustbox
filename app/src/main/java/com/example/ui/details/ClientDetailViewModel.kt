@@ -91,7 +91,7 @@ class ClientDetailViewModel(
   )
 
   fun exportStatementPdf(fileUri: Uri, context: Context) {
-    viewModelScope.launch {
+    viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
       val clientEntity = repository.getAllClientsEntities().find { it.id == clientId }
       if (clientEntity == null) {
         _errorMessage.value = "تعذر العثور على بيانات العميل لتصدير التقرير"
@@ -122,7 +122,7 @@ class ClientDetailViewModel(
           _isExportingPdf.value = false
           result.fold(
             onSuccess = {
-              _successMessage.value = "تم تصدير كشف الحساب بصيغة PDF بنجاح"
+              _successMessage.value = "تم حفظ كشف الحساب بصيغة PDF بنجاح"
             },
             onFailure = { err ->
               _errorMessage.value = "فشل تصدير كشف الحساب: ${err.localizedMessage}"
@@ -132,6 +132,44 @@ class ClientDetailViewModel(
       } catch (e: Exception) {
         _isExportingPdf.value = false
         _errorMessage.value = "حدث خطأ أثناء تصدير PDF: ${e.localizedMessage}"
+      }
+    }
+  }
+
+  fun exportStatementPdfDirectShare(context: Context) {
+    viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+      val clientEntity = repository.getAllClientsEntities().find { it.id == clientId }
+      if (clientEntity == null) {
+        _errorMessage.value = "تعذر العثور على بيانات العميل لتصدير التقرير"
+        return@launch
+      }
+
+      _isExportingPdf.value = true
+      clearMessages()
+
+      val transactionsEntities = repository.getAllTransactionsEntities().filter { it.clientId == clientId }
+
+      try {
+        val result = PdfReportGenerator.generateClientStatementReportToFile(
+          context = context,
+          client = clientEntity,
+          transactions = transactionsEntities
+        )
+
+        _isExportingPdf.value = false
+        result.fold(
+          onSuccess = { file ->
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+              PdfReportGenerator.sharePdfFile(context, file, "كشف حساب صندوق ${clientEntity.name}")
+            }
+          },
+          onFailure = { err ->
+            _errorMessage.value = "فشل إنشاء كشف الحساب: ${err.localizedMessage}"
+          }
+        )
+      } catch (e: Exception) {
+        _isExportingPdf.value = false
+        _errorMessage.value = "حدث خطأ: ${e.localizedMessage}"
       }
     }
   }

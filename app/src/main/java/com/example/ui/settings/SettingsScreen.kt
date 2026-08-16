@@ -636,10 +636,10 @@ fun SettingsScreen(
             )
             Spacer(modifier = Modifier.height(14.dp))
 
+            // Primary: Share/View PDF directly
             Button(
               onClick = {
-                val filename = "تقرير_صناديق_الأمانات_${System.currentTimeMillis()}.pdf"
-                pdfReportLauncher.launch(filename)
+                viewModel.exportAllClientsPdfDirectShare(context)
               },
               modifier = Modifier
                 .fillMaxWidth()
@@ -660,8 +660,33 @@ fun SettingsScreen(
               } else {
                 Icon(Icons.Default.PictureAsPdf, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("تصدير تقرير الخزينة العام (PDF)", fontWeight = FontWeight.Bold)
+                Text("مشاركة / فتح تقرير الخزينة (PDF)", fontWeight = FontWeight.Bold)
               }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Secondary: Save to specific folder (SAF)
+            OutlinedButton(
+              onClick = {
+                try {
+                  val filename = "تقرير_صناديق_الأمانات_${System.currentTimeMillis()}.pdf"
+                  pdfReportLauncher.launch(filename)
+                } catch (e: Exception) {
+                  // If SAF is not supported on device, fallback to direct share
+                  viewModel.exportAllClientsPdfDirectShare(context)
+                }
+              },
+              modifier = Modifier
+                .fillMaxWidth()
+                .height(44.dp)
+                .testTag("export_all_clients_pdf_saf_button"),
+              shape = RoundedCornerShape(12.dp),
+              enabled = !uiState.isExportingPdf
+            ) {
+              Icon(Icons.Default.Storage, contentDescription = null, tint = EmeraldPrimary, modifier = Modifier.size(18.dp))
+              Spacer(modifier = Modifier.width(8.dp))
+              Text("حفظ في مجلد مخصص أو Google Drive", style = MaterialTheme.typography.bodyMedium)
             }
           }
         }
@@ -677,24 +702,24 @@ fun SettingsScreen(
         ) {
           Column(modifier = Modifier.padding(16.dp)) {
             Text(
-              text = "حفظ البيانات في Google Drive أو الذاكرة المحلية",
+              text = "حفظ واستعادة البيانات محلياً أو سحابياً",
               style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-              text = "التطبيق يعمل بالكامل بدون إنترنت. عند الضغط على النسخ الاحتياطي، يمكنك اختيار مجلد 'Google Drive' المتزامن مع هاتفك ليتم حفظ الملف تلقائياً، أو حفظه في مجلد التنزيلات.",
+              text = "التطبيق يعمل بالكامل بدون إنترنت. يمكنك مشاركة أو حفظ ملف النسخة الاحتياطية (JSON) لإرساله عبر واتساب، جوجل درايف، البريد الإلكتروني، أو حفظه محلياً.",
               style = MaterialTheme.typography.bodySmall.copy(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 lineHeight = 18.sp
               )
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
-            // Export Button
+            // Primary: Export & Share Backup
             Button(
               onClick = {
-                backupFolderLauncher.launch(null)
+                viewModel.exportBackupDirectShare(context)
               },
               modifier = Modifier
                 .fillMaxWidth()
@@ -715,22 +740,50 @@ fun SettingsScreen(
               } else {
                 Icon(Icons.Default.CloudUpload, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("إنشاء وتصدير نسخة احتياطية (JSON)", fontWeight = FontWeight.Bold)
+                Text("مشاركة / حفظ نسخة احتياطية (JSON)", fontWeight = FontWeight.Bold)
               }
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Secondary: Save to specific folder (SAF)
+            OutlinedButton(
+              onClick = {
+                try {
+                  backupFolderLauncher.launch(null)
+                } catch (e: Exception) {
+                  viewModel.exportBackupDirectShare(context)
+                }
+              },
+              modifier = Modifier
+                .fillMaxWidth()
+                .height(44.dp)
+                .testTag("create_backup_saf_button"),
+              shape = RoundedCornerShape(12.dp),
+              enabled = !uiState.isExporting
+            ) {
+              Icon(Icons.Default.Storage, contentDescription = null, tint = EmeraldPrimary, modifier = Modifier.size(18.dp))
+              Spacer(modifier = Modifier.width(8.dp))
+              Text("اختيار مجلد مخصص للنسخ الاحتياطي", style = MaterialTheme.typography.bodyMedium)
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
 
             // Restore Button
             OutlinedButton(
               onClick = {
-                restoreFileLauncher.launch(arrayOf("application/json", "text/*", "*/*"))
+                try {
+                  restoreFileLauncher.launch(arrayOf("application/json", "text/*", "*/*"))
+                } catch (e: Exception) {
+                  android.widget.Toast.makeText(context, "تعذر فتح منتقي الملفات: ${e.localizedMessage}", android.widget.Toast.LENGTH_SHORT).show()
+                }
               },
               modifier = Modifier
                 .fillMaxWidth()
                 .height(48.dp)
                 .testTag("restore_backup_button"),
               shape = RoundedCornerShape(12.dp),
+              colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface),
               enabled = !uiState.isImporting
             ) {
               if (uiState.isImporting) {

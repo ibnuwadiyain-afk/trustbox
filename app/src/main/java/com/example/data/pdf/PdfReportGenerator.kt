@@ -335,8 +335,96 @@ object PdfReportGenerator {
     paint.textAlign = Paint.Align.CENTER
     canvas.drawText("تم استخراج هذا الكشف آلياً - إجمالي العمليات: ${NotificationHelper.formatDigits(transactions.size.toString(), context)} - صفحة $pageNumber", PAGE_WIDTH / 2f, PAGE_HEIGHT - MARGIN, paint)
 
-    document.finishPage(page)
-    document.writeTo(outputStream)
-    document.close()
+      document.finishPage(page)
+      document.writeTo(outputStream)
+      outputStream.flush()
+      document.close()
+    }
+
+  /**
+   * Generates All Clients Report directly into a cache/external file and returns the File
+   */
+  fun generateAllClientsReportToFile(
+    context: Context,
+    clients: List<ClientEntity>
+  ): Result<java.io.File> = runCatching {
+    val exportDir = java.io.File(context.cacheDir, "reports").apply { mkdirs() }
+    val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
+    val file = java.io.File(exportDir, "تقرير_صناديق_الأمانات_$timeStamp.pdf")
+    java.io.FileOutputStream(file).use { os ->
+      val res = generateAllClientsReport(context, clients, os)
+      if (res.isFailure) {
+        throw res.exceptionOrNull() ?: Exception("فشل إنشاء مستند PDF")
+      }
+    }
+    file
+  }
+
+  /**
+   * Generates Client Statement Report directly into a cache/external file and returns the File
+   */
+  fun generateClientStatementReportToFile(
+    context: Context,
+    client: ClientEntity,
+    transactions: List<TransactionEntity>
+  ): Result<java.io.File> = runCatching {
+    val exportDir = java.io.File(context.cacheDir, "statements").apply { mkdirs() }
+    val clientNameSafe = client.name.replace("\\s+".toRegex(), "_").replace("[^\\w\\u0600-\\u06FF_]".toRegex(), "")
+    val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
+    val file = java.io.File(exportDir, "كشف_حساب_${clientNameSafe}_$timeStamp.pdf")
+    java.io.FileOutputStream(file).use { os ->
+      val res = generateClientStatementReport(context, client, transactions, os)
+      if (res.isFailure) {
+        throw res.exceptionOrNull() ?: Exception("فشل إنشاء كشف حساب PDF")
+      }
+    }
+    file
+  }
+
+  /**
+   * Shares a PDF file using the Android system Share sheet via FileProvider
+   */
+  fun sharePdfFile(context: Context, file: java.io.File, title: String) {
+    try {
+      val uri = androidx.core.content.FileProvider.getUriForFile(
+        context,
+        "${context.packageName}.fileprovider",
+        file
+      )
+      val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+        type = "application/pdf"
+        putExtra(android.content.Intent.EXTRA_STREAM, uri)
+        putExtra(android.content.Intent.EXTRA_SUBJECT, title)
+        addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+      }
+      val chooser = android.content.Intent.createChooser(intent, title).apply {
+        addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+      }
+      context.startActivity(chooser)
+    } catch (e: Exception) {
+      android.widget.Toast.makeText(context, "تعذر مشاركة الملف: ${e.localizedMessage}", android.widget.Toast.LENGTH_LONG).show()
+    }
+  }
+
+  /**
+   * Opens a PDF file in any installed PDF reader application
+   */
+  fun openPdfFile(context: Context, file: java.io.File) {
+    try {
+      val uri = androidx.core.content.FileProvider.getUriForFile(
+        context,
+        "${context.packageName}.fileprovider",
+        file
+      )
+      val intent = android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
+        setDataAndType(uri, "application/pdf")
+        addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+      }
+      context.startActivity(intent)
+    } catch (e: Exception) {
+      // If no PDF reader is installed, fallback to share
+      sharePdfFile(context, file, "فتح ملف التقرير")
+    }
   }
 }
