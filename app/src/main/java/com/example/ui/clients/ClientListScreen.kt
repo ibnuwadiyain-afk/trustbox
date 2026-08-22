@@ -114,7 +114,7 @@ fun ClientListScreen(
 
   var contactPickerCallback by remember { mutableStateOf<((String?, String?) -> Unit)?>(null) }
   val contactPickerLauncher = rememberLauncherForActivityResult(
-    contract = ActivityResultContracts.PickContact()
+    contract = ContactPickerHelper.PickPhoneContactContract()
   ) { uri: Uri? ->
     uri?.let {
       val contactData = ContactPickerHelper.extractContactData(context, it)
