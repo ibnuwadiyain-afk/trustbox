@@ -112,6 +112,25 @@ fun ClientListScreen(
   var clientToDelete by remember { mutableStateOf<Client?>(null) }
   var showSortMenu by remember { mutableStateOf(false) }
 
+  var contactPickerCallback by remember { mutableStateOf<((String?, String?) -> Unit)?>(null) }
+  val contactPickerLauncher = rememberLauncherForActivityResult(
+    contract = ActivityResultContracts.PickContact()
+  ) { uri: Uri? ->
+    uri?.let {
+      val contactData = ContactPickerHelper.extractContactData(context, it)
+      contactPickerCallback?.invoke(contactData.name, contactData.phoneNumber)
+    }
+  }
+
+  val launchContactPicker: ((name: String?, phone: String?) -> Unit) -> Unit = { callback ->
+    contactPickerCallback = callback
+    try {
+      contactPickerLauncher.launch(null)
+    } catch (e: Exception) {
+      Toast.makeText(context, "تعذر فتح دليل الهاتف: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+    }
+  }
+
   LaunchedEffect(uiState.userMessage) {
     uiState.userMessage?.let { msg ->
       snackbarHostState.showSnackbar(msg)
@@ -299,6 +318,7 @@ fun ClientListScreen(
         AddEditClientDialog(
           client = null,
           onDismiss = { showAddDialog = false },
+          onPickContact = launchContactPicker,
           onSave = { name, phone, boxNumber, balance, notes ->
             viewModel.addClient(name, phone, boxNumber, balance, notes) {
               showAddDialog = false
@@ -312,6 +332,7 @@ fun ClientListScreen(
         AddEditClientDialog(
           client = client,
           onDismiss = { clientToEdit = null },
+          onPickContact = launchContactPicker,
           onSave = { name, phone, boxNumber, _, notes ->
             viewModel.updateClient(
               client.copy(
@@ -648,6 +669,7 @@ fun EmptyClientsView(
 fun AddEditClientDialog(
   client: Client?,
   onDismiss: () -> Unit,
+  onPickContact: ((name: String?, phone: String?) -> Unit) -> Unit,
   onSave: (name: String, phone: String, boxNumber: String, initialBalance: Double, notes: String) -> Unit
 ) {
   val context = LocalContext.current
@@ -658,16 +680,13 @@ fun AddEditClientDialog(
   var notes by remember { mutableStateOf(client?.notes ?: "") }
   var errorMessage by remember { mutableStateOf<String?>(null) }
 
-  val contactPickerLauncher = rememberLauncherForActivityResult(
-    contract = ActivityResultContracts.PickContact()
-  ) { uri: Uri? ->
-    uri?.let {
-      val contactData = ContactPickerHelper.extractContactData(context, it)
-      if (!contactData.phoneNumber.isNullOrBlank()) {
-        phone = contactData.phoneNumber
+  val handlePickContact = {
+    onPickContact { pickedName, pickedPhone ->
+      if (!pickedPhone.isNullOrBlank()) {
+        phone = pickedPhone
       }
-      if (name.isBlank() && !contactData.name.isNullOrBlank()) {
-        name = contactData.name
+      if (name.isBlank() && !pickedName.isNullOrBlank()) {
+        name = pickedName
         errorMessage = null
       }
     }
@@ -712,13 +731,7 @@ fun AddEditClientDialog(
             shape = RoundedCornerShape(12.dp),
             trailingIcon = {
               IconButton(
-                onClick = {
-                  try {
-                    contactPickerLauncher.launch(null)
-                  } catch (e: Exception) {
-                    Toast.makeText(context, "تعذر فتح دليل الهاتف: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
-                  }
-                },
+                onClick = handlePickContact,
                 modifier = Modifier.testTag("pick_contact_icon_button")
               ) {
                 Icon(
@@ -736,13 +749,7 @@ fun AddEditClientDialog(
           Spacer(modifier = Modifier.height(4.dp))
 
           Surface(
-            onClick = {
-              try {
-                contactPickerLauncher.launch(null)
-              } catch (e: Exception) {
-                Toast.makeText(context, "تعذر فتح دليل الهاتف: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
-              }
-            },
+            onClick = handlePickContact,
             shape = RoundedCornerShape(8.dp),
             color = EmeraldPrimaryContainer.copy(alpha = 0.5f),
             modifier = Modifier

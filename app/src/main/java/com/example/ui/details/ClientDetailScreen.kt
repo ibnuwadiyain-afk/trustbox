@@ -160,6 +160,25 @@ fun ClientDetailScreen(
     }
   }
 
+  var contactPickerCallback by remember { mutableStateOf<((String?, String?) -> Unit)?>(null) }
+  val contactPickerLauncher = rememberLauncherForActivityResult(
+    contract = ActivityResultContracts.PickContact()
+  ) { uri: Uri? ->
+    uri?.let {
+      val contactData = ContactPickerHelper.extractContactData(context, it)
+      contactPickerCallback?.invoke(contactData.name, contactData.phoneNumber)
+    }
+  }
+
+  val launchContactPicker: ((name: String?, phone: String?) -> Unit) -> Unit = { callback ->
+    contactPickerCallback = callback
+    try {
+      contactPickerLauncher.launch(null)
+    } catch (e: Exception) {
+      Toast.makeText(context, "تعذر فتح دليل الهاتف: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+    }
+  }
+
   CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
     Scaffold(
       modifier = modifier.fillMaxSize(),
@@ -375,16 +394,13 @@ fun ClientDetailScreen(
         var boxNumber by remember { mutableStateOf(client.boxNumber) }
         var notes by remember { mutableStateOf(client.notes) }
 
-        val contactPickerLauncher = rememberLauncherForActivityResult(
-          contract = ActivityResultContracts.PickContact()
-        ) { uri: Uri? ->
-          uri?.let {
-            val contactData = ContactPickerHelper.extractContactData(context, it)
-            if (!contactData.phoneNumber.isNullOrBlank()) {
-              phone = contactData.phoneNumber
+        val handlePickContact = {
+          launchContactPicker { pickedName, pickedPhone ->
+            if (!pickedPhone.isNullOrBlank()) {
+              phone = pickedPhone
             }
-            if (name.isBlank() && !contactData.name.isNullOrBlank()) {
-              name = contactData.name
+            if (name.isBlank() && !pickedName.isNullOrBlank()) {
+              name = pickedName
             }
           }
         }
@@ -414,13 +430,7 @@ fun ClientDetailScreen(
                   shape = RoundedCornerShape(12.dp),
                   trailingIcon = {
                     IconButton(
-                      onClick = {
-                        try {
-                          contactPickerLauncher.launch(null)
-                        } catch (e: Exception) {
-                          Toast.makeText(context, "تعذر فتح دليل الهاتف: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
-                        }
-                      }
+                      onClick = handlePickContact
                     ) {
                       Icon(
                         imageVector = Icons.Default.ContactPhone,
@@ -435,13 +445,7 @@ fun ClientDetailScreen(
                 Spacer(modifier = Modifier.height(4.dp))
 
                 Surface(
-                  onClick = {
-                    try {
-                      contactPickerLauncher.launch(null)
-                    } catch (e: Exception) {
-                      Toast.makeText(context, "تعذر فتح دليل الهاتف: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
-                    }
-                  },
+                  onClick = handlePickContact,
                   shape = RoundedCornerShape(8.dp),
                   color = EmeraldPrimaryContainer.copy(alpha = 0.5f),
                   modifier = Modifier.align(Alignment.Start)
